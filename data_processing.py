@@ -2,23 +2,15 @@ import pandas as pd
 
 path = 'space_missions.csv'
 
-class DataLoadError(Exception):
-    """Custom exception for data loading errors"""
-    pass
-
-class ValidationError(Exception):
-    """Custom exception for validation errors"""
-    pass
 
 def load_file(filepath):
     try:
-        return pd.read_csv(path)
+        return pd.read_csv(filepath)
     except FileNotFoundError:
-        print(f"Error: File '{filepath}' not found")
-        return None
+        raise FileNotFoundError(f"File '{filepath}' not found")
     except Exception as e:
-        print(f"Error loading file: {e}")
-        return None
+        raise Exception(f"Error loading file: {e}")
+
 
 def getMissionCountByCompany(companyName: str) -> int:
     """
@@ -26,12 +18,19 @@ def getMissionCountByCompany(companyName: str) -> int:
     :param companyName: name of company
     :return: total # number of missions
     """
+    if not companyName or not isinstance(companyName, str):
+        raise ValueError("Company name must be a non-empty string")
+
     df = load_file(path)
+
+    if companyName not in df['Company'].values:
+        raise ValueError(f"Company '{companyName}' not found in database")
 
     company_df = df[(df['Company'] == companyName)]
     mission_count = len(company_df)
 
     return mission_count
+
 
 def getSuccessRate(companyName: str) -> float:
     """
@@ -41,10 +40,13 @@ def getSuccessRate(companyName: str) -> float:
     :param companyName: name of company
     :return: success rate rounded to 2 decimal places, or 0.0 if company has no missions
     """
+    if not companyName or not isinstance(companyName, str):
+        raise ValueError("Company name must be a non-empty string")
+
     df = load_file(path)
 
-    # Not utilized, since this would need to load the dataframe again
-    # total_count = getMissionCountByCompany(companyName)
+    if companyName not in df['Company'].values:
+        raise ValueError(f"Company '{companyName}' not found in database")
 
     company_df = df[(df['Company'] == companyName)]
     total_count = len(company_df)
@@ -54,7 +56,8 @@ def getSuccessRate(companyName: str) -> float:
     if total_count == 0 or success_count == 0:
         return 0.0
 
-    return round((success_count / total_count)*100, 2)
+    return round((success_count / total_count) * 100, 2)
+
 
 def getMissionsByDateRange(startDate: str, endDate: str) -> list:
     """
@@ -63,17 +66,31 @@ def getMissionsByDateRange(startDate: str, endDate: str) -> list:
     :param endDate: end date in "YYYY-MM-DD" format
     :return: list of missions within start and end date
     """
+    if not startDate or not endDate:
+        raise ValueError("Start date and end date must be provided")
 
     df = load_file(path)
 
-    df['Date'] = pd.to_datetime(df['Date'])
+    try:
+        df['Date'] = pd.to_datetime(df['Date'])
+        start = pd.to_datetime(startDate)
+        end = pd.to_datetime(endDate)
+    except Exception as e:
+        raise ValueError(f"Invalid date format. Expected YYYY-MM-DD: {e}")
 
-    start = pd.to_datetime(startDate)
-    end = pd.to_datetime(endDate)
+    if start > end:
+        raise ValueError("Start date cannot be after end date")
+
+    min_date = df['Date'].min()
+    max_date = df['Date'].max()
+
+    if start > max_date or end < min_date:
+        raise ValueError(f"Date range is outside database bounds ({min_date.date()} to {max_date.date()})")
 
     dated_df = df[(df['Date'] >= start) & (df['Date'] <= end)]
 
     return dated_df['Mission'].to_list()
+
 
 def getTopCompaniesByMissionCount(n: int) -> list:
     """
@@ -84,6 +101,8 @@ def getTopCompaniesByMissionCount(n: int) -> list:
             missionCount is descending order
             companyName in ascending order
     """
+    if not isinstance(n, int) or n <= 0:
+        raise ValueError("n must be a positive integer")
 
     df = load_file(path)
 
@@ -99,18 +118,18 @@ def getTopCompaniesByMissionCount(n: int) -> list:
 
     return list(zip(top_n['Company'], top_n['Count']))
 
+
 def getMissionStatusCount() -> dict:
     """
     Function 5
     :return:
         - dictionary: ( key: 'MissionStatus', value: 'count')
     """
-
     df = load_file(path)
-
     status_counts = df['MissionStatus'].value_counts()
 
     return status_counts.to_dict()
+
 
 def getMissionsByYear(year: int) -> int:
     """
@@ -118,14 +137,27 @@ def getMissionsByYear(year: int) -> int:
     :param year: Year
     :return: Total # of missions in that year
     """
+    if not isinstance(year, int):
+        raise ValueError("Year must be an integer")
 
     df = load_file(path)
 
-    df['Date'] = pd.to_datetime(df['Date'])
+    try:
+        df['Date'] = pd.to_datetime(df['Date'])
 
-    missions_count = df[df['Date'].dt.year == year]
+        min_year = df['Date'].dt.year.min()
+        max_year = df['Date'].dt.year.max()
 
-    return len(missions_count)
+        if year < min_year or year > max_year:
+            raise ValueError(f"Year {year} is outside database bounds ({min_year} to {max_year})")
+
+        missions_count = df[df['Date'].dt.year == year]
+        return len(missions_count)
+    except ValueError:
+        raise
+    except Exception as e:
+        raise Exception(f"Error processing year: {e}")
+
 
 def getMostUsedRocket() -> str:
     """
@@ -145,6 +177,7 @@ def getMostUsedRocket() -> str:
 
     return rocket_df.iloc[0]['Rocket']
 
+
 def getAverageMissionsPerYear(startYear: int, endYear: int) -> float:
     """
     Function 8
@@ -153,19 +186,46 @@ def getAverageMissionsPerYear(startYear: int, endYear: int) -> float:
     :return: average missions per year
         - rounded to 2 decimal places
     """
+    if not isinstance(startYear, int) or not isinstance(endYear, int):
+        raise ValueError("Years must be integers")
+
+    if startYear > endYear:
+        raise ValueError("Start year cannot be after end year")
 
     df = load_file(path)
 
-    df['Date'] = pd.to_datetime(df['Date'])
-    df['Year'] = df['Date'].dt.year
+    try:
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Year'] = df['Date'].dt.year
 
-    filtered_df = df[(df['Year'] >= startYear) & (df['Year'] <= endYear)]
-    total_years = endYear - startYear + 1
+        min_year = df['Year'].min()
+        max_year = df['Year'].max()
 
-    total_missions = len(filtered_df)
-    average = total_missions/total_years
+        if startYear > max_year or endYear < min_year:
+            raise ValueError(f"Year range is outside database bounds ({min_year} to {max_year})")
 
-    return round(average, 2)
+        if startYear < min_year or endYear > max_year:
+            raise ValueError(
+                f"Year range ({startYear}-{endYear}) outside database bounds ({min_year} to {max_year})")
 
-print(getAverageMissionsPerYear(2010, 2020))
+        filtered_df = df[(df['Year'] >= startYear) & (df['Year'] <= endYear)]
+        total_years = endYear - startYear + 1
 
+        total_missions = len(filtered_df)
+        average = total_missions / total_years
+
+        return round(average, 2)
+    except ValueError:
+        raise
+    except Exception as e:
+        raise Exception(f"Error calculating average: {e}")
+
+
+try:
+    print(getAverageMissionsPerYear(1957, 2020))
+except ValueError as e:
+    print(f"Validation Error: {e}")
+except FileNotFoundError as e:
+    print(f"File Error: {e}")
+except Exception as e:
+    print(f"Error: {e}")

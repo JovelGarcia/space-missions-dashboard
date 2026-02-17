@@ -1,5 +1,39 @@
 # Space Missions Dashboard
 
+## Get Started
+
+1. **Clone the repo**
+```bash
+   git clone https://github.com/JovelGarcia/space-missions-dashboard
+   cd space-missions-dashboard
+```
+
+2. **Create a virtual environment**
+```bash
+   python -m venv .venv
+```
+
+3. **Activate it**
+
+macOS/Linux:
+```bash
+   source .venv/bin/activate
+```
+Windows:
+```bash
+   .venv\Scripts\activate
+```
+
+4. **Install dependencies**
+```bash
+   pip install -r requirements.txt
+```
+
+5. **Run the app**
+```bash
+   streamlit run app.py
+```
+
 ## Data Table View
 - Contains sorting
 - Contains filtering
